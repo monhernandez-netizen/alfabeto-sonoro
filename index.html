@@ -1340,6 +1340,28 @@
 
 <script>
   // ---------------------------------------------------------------
+  // Reproductor de audio único: si toco un sonido mientras otro está
+  // sonando, corta el anterior en vez de superponerse. Se usa para
+  // todos los audios de la app (letras, consignas, ayuda, etc).
+  // ---------------------------------------------------------------
+  const _audioCache = {};
+  let _activeAudio = null;
+  function playSound(src, onError){
+    let audio = _audioCache[src];
+    if (!audio){
+      audio = new Audio(src);
+      _audioCache[src] = audio;
+    }
+    if (_activeAudio && _activeAudio !== audio){
+      _activeAudio.pause();
+      _activeAudio.currentTime = 0;
+    }
+    _activeAudio = audio;
+    audio.currentTime = 0;
+    audio.play().catch(() => { if (onError) onError(); });
+  }
+
+  // ---------------------------------------------------------------
   // Navegación entre pantallas (todo vive en este mismo archivo)
   // ---------------------------------------------------------------
   function showScreen(id){
@@ -1488,11 +1510,11 @@
 
   // Nivel 1 — CVCV (palabras cortas, todas 4 sonidos)
   const WORDS_NIVEL1 = [
-    { id: 'pato', answer: 4, letter: 'P' },
     { id: 'mesa', answer: 4, letter: 'M' },
     { id: 'sapo', answer: 4, letter: 'S' },
     { id: 'luna', answer: 4, letter: 'L' },
     { id: 'gato', answer: 4, letter: 'G' },
+    { id: 'pato', answer: 4, letter: 'P' },
   ];
 
   // Nivel 2 — CVCVCV (palabras más largas, todas 6 sonidos)
@@ -1634,10 +1656,7 @@
 
     function playHelp(){
       const word = words[index];
-      const audio = new Audio(`ayuda/${word.id}.mp3`);
-      audio.play().catch(() => {
-        showNoSoundHint(); // reutiliza el mismo avisito del Nivel 4
-      });
+      playSound(`ayuda/${word.id}.mp3`, showNoSoundHint); // reutiliza el mismo avisito del Nivel 4
     }
 
     tapBtn.addEventListener('click', tick);
@@ -2083,11 +2102,10 @@
 
   // Precargamos un elemento <audio> por letra para poder
   // reproducirlo al instante y permitir toques repetidos rápidos.
-  const audioMap = {};
   LETTERS.forEach(letterInfo => {
     const audio = new Audio(`sounds/${letterInfo.id}.mp3`);
     audio.preload = 'auto';
-    audioMap[letterInfo.id] = audio;
+    _audioCache[`sounds/${letterInfo.id}.mp3`] = audio;
   });
 
   // Construir el teclado en pantalla
@@ -2127,11 +2145,7 @@
       setTimeout(() => btnEl.classList.remove('pressed'), 120);
     }
 
-    const audio = audioMap[letterInfo.id];
-    audio.currentTime = 0;
-    audio.play().catch(() => {
-      showNoSoundHint();
-    });
+    playSound(`sounds/${letterInfo.id}.mp3`, showNoSoundHint);
   }
 
   function showNoSoundHint(){
@@ -2151,8 +2165,7 @@
       const screenEl = btn.closest('.screen');
       const screenId = screenEl ? screenEl.id : null;
       if (!screenId) return;
-      const audio = new Audio(`consignas/${screenId}.mp3`);
-      audio.play().catch(() => showNoSoundHint());
+      playSound(`consignas/${screenId}.mp3`, showNoSoundHint);
     });
   });
 
